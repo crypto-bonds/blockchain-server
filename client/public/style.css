@@ -1,8 +1,30 @@
-.hero{
-    background-color: white;
-    height: 100px;
-    width: 100px;
+/* .hero{
+    background-image: url("hero.png");
+    z-index: 5;
+    background-color: aliceblue;
+    height: 500px;
+    width: 500px;
     float: right;
     top: 0;
-    margin-bottom: auto;
+    right: 0;
+    position: relative;
+} */
+
+.hero{
+position: absolute;
+/* float: left; */
+background-image: url("hero.png");
+  /* background-color: #cccccc; */
+  height: 500px;
+  width: 50%;
+  right: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+body{
+    position: absolute;
+    width: 100%;
+    height: 100%;
 }

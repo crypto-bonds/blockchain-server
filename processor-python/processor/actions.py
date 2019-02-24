@@ -1,7 +1,7 @@
 from uuid import uuid4
 import json
 
-from processor import get_addresses
+from processor import get_addresses, get_data
 
 
 def is_clearer(context, initiator_pubkey):
@@ -62,7 +62,7 @@ def issue_bond(context, initiator_pubkey, message_dict):
     # create bonds
     for bond_uuid in issuance_data['serials']:
         new_state_dict[get_issuance_address(bond_uuid)] = {
-                'owner_uuid': message_dict['bank_uuid'],
+                'owner_pubkey': message_dict['bank_pubkey'],
                 'issuance_uuid': bond_uuid
         }
 
@@ -87,18 +87,35 @@ def buy_bonds_otc(context, initiator_pubkey, message_dict):
     if not is_trader(message_dict['trader_pubkey']):
         return
     
+    new_state_dict = {}
+
     # get the first ids from the bank
-    message_dict['issuance_uuid']
     num_bought = message_dict['num_bought']
 
-    bonds_address = get_addresses.get_bank_bonds_address(message_dict['bank_pubkey'], message_dict['issuance_uuid'])
-    bonds_to_transfer = 
+    bank_address = get_addresses.get_bank_bonds_address(message_dict['bank_pubkey'], message_dict['issuance_uuid'])
+    bank_data = get_data.query(bank_address)
+    if num_bought > num_owned:
+        return  # transaction failed
 
+    bonds_to_transfer = data['serials'][:num_bought]
+    bonds_to_stay = data['serials'][num_bought:]
 
-    # change owner on bonds
-    # change totals and serials for bank (bank bonds)
-    # change totals and serials for trader (trader bonds)
-    # change bank bonds
+    bank_data['num_owned'] -= num_bought
+    bank_data['serials'] = bonds_to_stay
+    new_state_dict[bank_address] = bank_data
+
+    for bond_uuid in bonds_to_transfer:
+        bond_address = get_addresses.get_bond_address(bond_uuid)
+        bond_data = get_data.query(bond_address)
+        bond_data['owner_pubkey'] = message_dict['trader_pubkey']
+        new_state_dict[bond_address] = bond_data
+    
+    trader_address = get_addresses.get_trader_bonds_address(message_dict['trader_pubkey'], message_dict['issuance_uuid'])
+    trader_data = get_data.query(trader_address)
+    trader_data['total_owned'] += num_bought
+    trader_data['serials'] = sorted(trader_data['serials'] + bonds_to_transfer)
+    new_state_dict[trader_address] = trader_data
+    
     context.set_state(new_state_dict)
 
 def initiate_trade(context, initiator_pubkey, message_dict):

@@ -28,7 +28,7 @@ const fetch = () => {
 
 // buy/sell crypto/ bond orders
 // todo
-const buysellbond = () => {
+const buy_orders = () => {
   return m.request({
     method: 'GET',
     url: '/api/state?address=b04d03'
@@ -42,7 +42,7 @@ const buysellbond = () => {
 
 // buy/sell crypto/ bond orders
 // todo
-const get_one_buysellbond = () => {
+const get_one_buy_orders = () => {
   return m.request({
     method: 'GET',
     data: uuid,
@@ -83,7 +83,7 @@ const get_one_owner = () => {
 }
 
 // Fetch all pirate messages from the Sawtooth REST API
-const bondtype = () => {
+const bond_type = () => {
   return m.request({
     method: 'GET',
     url: '/api/state?address=b04d06'
@@ -96,7 +96,7 @@ const bondtype = () => {
 }
 
 // Fetch all pirate messages from the Sawtooth REST API
-const get_one_bondtype = () => {
+const get_one_bond_type = () => {
   return m.request({
     method: 'GET',
     data: uuid,
@@ -136,7 +136,7 @@ const get_one_bonds = () => {
 }
 
 // Fetch all pirate messages from the Sawtooth REST API
-const cryptopubkey = () => {
+const crypto_pubkey = () => {
   return m.request({
     method: 'GET',
     url: '/api/state?address=b04d12'
@@ -149,7 +149,7 @@ const cryptopubkey = () => {
 }
 
 // Fetch all pirate messages from the Sawtooth REST API
-const get_one_cryptopubkey = () => {
+const get_one_crypto_pubkey = () => {
   return m.request({
     method: 'GET',
     data: uuid,
@@ -163,7 +163,7 @@ const get_one_cryptopubkey = () => {
 }
 
 // Fetch all pirate messages from the Sawtooth REST API
-const cryptotype = () => {
+const crypto_type = () => {
   return m.request({
     method: 'GET',
     url: '/api/state?address=b04d04'
@@ -176,7 +176,7 @@ const cryptotype = () => {
 }
 
 // Fetch all pirate messages from the Sawtooth REST API
-const get_one_cryptotype = () => {
+const get_one_crypto_type = () => {
   return m.request({
     method: 'GET',
     data: uuid,
@@ -245,7 +245,7 @@ const get_one_ownerbonds = () => {
 }
 
 // Fetch all pirate messages from the Sawtooth REST API
-const ownercrypto = () => {
+const trader_crypto = () => {
   return m.request({
     method: 'GET',
     url: '/api/state?address=b04d09'
@@ -258,7 +258,7 @@ const ownercrypto = () => {
 }
 
 // Fetch all pirate messages from the Sawtooth REST API
-const get_one_ownercrypto = () => {
+const get_one_trader_crypto = () => {
   return m.request({
     method: 'GET',
     data: uuid,

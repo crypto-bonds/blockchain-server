@@ -1,3 +1,3 @@
 # Contributors
-- [Jonathan Segal] (https://github.com/jonathannsegal)
-- [Sean McGee] (https://github.com/seantm2)
+- [Jonathan Segal](https://github.com/jonathannsegal)
+- [Sean McGee](https://github.com/seantm2)

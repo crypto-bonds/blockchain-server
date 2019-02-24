@@ -35,7 +35,7 @@ def is_trader(context, trader_pubkey):
 
 def issue_bond(context, initiator_pubkey, message_dict):
 
-    if not is_bank(context, message_dict['bank_pubkey'])
+    if not is_bank(context, message_dict['bank_pubkey']):
         return
     if not is_clearer(context, initiator_pubkey):
         return
@@ -330,8 +330,6 @@ def add_clearer(context, initiator_pubkey, message_dict):
     }
 
     context.set_state(new_state_dict)
-
-    
 
 def add_bank(context, initiator_pubkey, message_dict):   
     bank_address = get_addresses.get_owner_address(initiator_pubkey)

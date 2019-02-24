@@ -1,7 +1,7 @@
 from uuid import uuid4
 import json
 
-from preprocessor import get_addresses
+from processor import get_addresses
 
 
 def is_clearer(context, initiator_pubkey):

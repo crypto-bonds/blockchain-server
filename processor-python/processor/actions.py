@@ -282,7 +282,30 @@ def accept_trade(context, initiator_pubkey, message_dict):
     context.set_state(new_state_dict)
 
 def add_crypto(context, initiator_pubkey, message_dict):
-    pass
+    if not is_clearer(context, initiator_pubkey):
+        return
+    crypto_address = get_addresses.get_owner_crypto_pubkeys_address(initiator_pubkey,message_dict['crypto_type_uuid'])
+    crypto_data = {
+        'num_owned':message_dict['num_owned']
+        'orders':{}
+        'total_owned':message_dict['total_owned']
+    }
+    # create crypto currency
+    for serial in crypto_data['orders']:
+        new_state_dict[get_crypto_address(serial)] = {
+                'owner_pubkey': message_dict['trader_pubkey'],
+                'crypto_type_uuid': message_dict['crypto_type_uuid']
+        }
+
+    # assign crypto currency to owner
+    bank_bonds_address = get_addresses.get_bank_bonds_address(message_dict['trader_pubkey'], message_dict['crypto_type_uuid'])
+    new_state_dict[trader_crypto_address] = {
+        'num_owned': len(crypto_data['orders']),
+        'orders': crypto_data['orders']
+    }
+
+    context.set_state(new_state_dict)
+
 
 def add_clearer(context, initiator_pubkey, message_dict):   
     clearer_address =  get_addresses.get_clearer_address(initiator_pubkey):

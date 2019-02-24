@@ -166,7 +166,41 @@ def initiate_trade(context, initiator_pubkey, message_dict):
     context.set_state(new_state_dict)
 
 def cancel_trade(context, initiator_pubkey, message_dict):
-    pass
+    order_address = get_addresses.get_order_address(message_dict['order_uuid'])
+    order_data = get_data.query(order_address)
+
+    if order_data is None:
+        return  # Order doesn't exist, bad request
+    
+    if order_data['initiator_pubkey'] != initiator_pubkey:
+        return  # Only initiator can cancel trades
+
+    # remove order from order books
+    buy_order_address = get_addresses.get_buy_order_address(order_data['sell_asset_type'], order_data['buy_asset_type'])
+    sell_order_address = get_addresses.get_sell_order_address(order_data['buy_asset_type'], order_data['sell_asset_type'])
+    buy_order_data = get_data.query(buy_order_address)
+    sell_order_data = get_data.query(sell_order_address)
+
+    buy_order_data['orders'].remove(message_dict['order_uuid'])
+    sell_order_data['orders'].remove(message_dict['order_uuid'])
+
+    # save updated order books
+    new_state_dict[buy_order_address] = json.dumps(buy_order_data, sort_keys=True)
+    new_state_dict[sell_order_address] = json.dumps(sell_order_data, sort_keys=True)
+    
+    # start manipulaing trader data
+
+    # remove order from initiator order list
+    # Call it bond because in the future, we also want to use crypto and distinguish between the two
+    trade_initiator_bond_asset1_address = get_addresses.get_trader_bonds_address(order_data['initiator_pubkey'], order_data['sell_asset_type'])
+    trade_initiator_bond_asset1_data = get_data.query(trade_initiator_bond_asset1_address)
+
+    trade_initiator_bond_asset1_data['orders'].remove(message_dict['order_uuid'])
+
+    # delete order
+    new_state_dict[order_address] = None  # TODO This may not be right
+    
+    context.set_state(new_state_dict)
 
 def accept_trade(context, initiator_pubkey, message_dict):
     # in this context, there is initiator_pubkey and order_data['initiator_pubkey']

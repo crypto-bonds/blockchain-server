@@ -1,102 +1,133 @@
-version: '2.1'
+# Resources to provision on app creation
+setup:
+  addons:
+    - plan: heroku-postgresql
+      as: DATABASE
+  config:
+    S3_BUCKET: my-example-bucket
+# Reference the Dockerfiles to build into Docker images 
+build:
+  docker:
+    web: Dockerfile
+    worker: worker/Dockerfile
+  config:
+    RAILS_ENV: development
+    FOO: bar
+# Run a command on each release 
+release:
+  command:
+    - ./deployment-tasks.sh
+  # Use the worker image to execute the release command
+  image: worker
+# The process types and commands to run
+run:
+  web: bundle exec puma -C config/puma.rb
+  worker: python myworker.py
+  asset-syncer:
+    command:
+      - docker-compose up
+      # Use the worker image with this process type
+      image: worker
 
-services:
-  client:
-    image: client
-    container_name: client
-    build:
-      context: ./client
-      dockerfile: docker/server.dockerfile
-    volumes:
-      - ./client/public/:/usr/local/apache2/htdocs/
-    expose:
-      - 80
-    ports:
-      - 8080:80
+# version: '2.1'
 
-  client-builder:
-    image: client-builder
-    container_name: client-builder
-    build:
-      context: ./client
-      dockerfile: docker/builder.dockerfile
-    volumes:
-      - ./client/:/pirate-talk/client/
-      - /pirate-talk/client/node_modules
+# services:
+#   client:
+#     image: client
+#     container_name: client
+#     build:
+#       context: ./client
+#       dockerfile: docker/server.dockerfile
+#     volumes:
+#       - ./client/public/:/usr/local/apache2/htdocs/
+#     expose:
+#       - 80
+#     ports:
+#       - 8080:80
 
-
-  processor-python:
-    image: hyperledger/sawtooth-shell:1.0
-    container_name: processor-python
-    volumes:
-      - ./processor-python/:/pirate-talk/processor-python/
-    environment:
-      - PYTHONUNBUFFERED=0
-    working_dir: /pirate-talk/processor-python/
-    entrypoint: bin/pirate-tp --connect tcp://validator:4004
+#   client-builder:
+#     image: client-builder
+#     container_name: client-builder
+#     build:
+#       context: ./client
+#       dockerfile: docker/builder.dockerfile
+#     volumes:
+#       - ./client/:/pirate-talk/client/
+#       - /pirate-talk/client/node_modules
 
 
-  validator:
-    image: hyperledger/sawtooth-validator:1.0
-    container_name: validator
-    volumes:
-      - .:/pirate-talk
-    expose:
-      - 4004
-    ports:
-      - 4004:4004
-    entrypoint: |
-      bash -c "
-        if [ ! -f /etc/sawtooth/keys/validator.priv ]; then
-          sawadm keygen &&
-          sawtooth keygen &&
-          sawset genesis \
-            -k /etc/sawtooth/keys/validator.priv \
-            -o config-genesis.batch &&
-          sawset proposal create \
-            -k /etc/sawtooth/keys/validator.priv \
-            sawtooth.swa.administrators=$$(cat /root/.sawtooth/keys/root.pub) \
-            sawtooth.validator.batch_injectors=block_info \
-            -o config.batch &&
-          sawadm genesis config-genesis.batch config.batch
-        fi;
-        sawtooth-validator -vv \
-          --endpoint tcp://validator:8800 \
-          --bind component:tcp://eth0:4004 \
-          --bind network:tcp://eth0:8800 \
-        "
+#   processor-python:
+#     image: hyperledger/sawtooth-shell:1.0
+#     container_name: processor-python
+#     volumes:
+#       - ./processor-python/:/pirate-talk/processor-python/
+#     environment:
+#       - PYTHONUNBUFFERED=0
+#     working_dir: /pirate-talk/processor-python/
+#     entrypoint: bin/pirate-tp --connect tcp://validator:4004
 
-  rest-api:
-    image: hyperledger/sawtooth-rest-api:1.0
-    container_name: rest-api
-    expose:
-      - 8008
-    ports:
-      - 8008:8008
-    entrypoint: |
-      sawtooth-rest-api -vv
-        --connect tcp://validator:4004
-        --bind rest-api:8008
 
-  shell:
-    image: hyperledger/sawtooth-shell:1.0
-    container_name: shell
-    entrypoint: |
-      bash -c "
-        if [ ! -f /root/.sawtooth/keys/root.priv ]; then
-          sawtooth keygen
-        fi;
-        tail -f /dev/null
-      "
+#   validator:
+#     image: hyperledger/sawtooth-validator:1.0
+#     container_name: validator
+#     volumes:
+#       - .:/pirate-talk
+#     expose:
+#       - 4004
+#     ports:
+#       - 4004:4004
+#     entrypoint: |
+#       bash -c "
+#         if [ ! -f /etc/sawtooth/keys/validator.priv ]; then
+#           sawadm keygen &&
+#           sawtooth keygen &&
+#           sawset genesis \
+#             -k /etc/sawtooth/keys/validator.priv \
+#             -o config-genesis.batch &&
+#           sawset proposal create \
+#             -k /etc/sawtooth/keys/validator.priv \
+#             sawtooth.swa.administrators=$$(cat /root/.sawtooth/keys/root.pub) \
+#             sawtooth.validator.batch_injectors=block_info \
+#             -o config.batch &&
+#           sawadm genesis config-genesis.batch config.batch
+#         fi;
+#         sawtooth-validator -vv \
+#           --endpoint tcp://validator:8800 \
+#           --bind component:tcp://eth0:4004 \
+#           --bind network:tcp://eth0:8800 \
+#         "
 
-  settings-tp:
-    image: hyperledger/sawtooth-settings-tp:1.0
-    container_name: settings-tp
-    entrypoint: settings-tp -vv --connect tcp://validator:4004
+#   rest-api:
+#     image: hyperledger/sawtooth-rest-api:1.0
+#     container_name: rest-api
+#     expose:
+#       - 8008
+#     ports:
+#       - 8008:8008
+#     entrypoint: |
+#       sawtooth-rest-api -vv
+#         --connect tcp://validator:4004
+#         --bind rest-api:8008
 
-  block-info-tp:
-    image: hyperledger/sawtooth-block-info-tp:1.0
-    container_name: block-info-tp
-    depends_on:
-      - validator
-    command: block-info-tp -vv --connect tcp://validator:4004
+#   shell:
+#     image: hyperledger/sawtooth-shell:1.0
+#     container_name: shell
+#     entrypoint: |
+#       bash -c "
+#         if [ ! -f /root/.sawtooth/keys/root.priv ]; then
+#           sawtooth keygen
+#         fi;
+#         tail -f /dev/null
+#       "
+
+#   settings-tp:
+#     image: hyperledger/sawtooth-settings-tp:1.0
+#     container_name: settings-tp
+#     entrypoint: settings-tp -vv --connect tcp://validator:4004
+
+#   block-info-tp:
+#     image: hyperledger/sawtooth-block-info-tp:1.0
+#     container_name: block-info-tp
+#     depends_on:
+#       - validator
+#     command: block-info-tp -vv --connect tcp://validator:4004

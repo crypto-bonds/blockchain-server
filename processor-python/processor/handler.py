@@ -1,6 +1,7 @@
 from sawtooth_sdk.processor.handler import TransactionHandler
 from sawtooth_sdk.processor.exceptions import InvalidTransaction
 
+import json
 
 class BondHandler(TransactionHandler):
     @property
@@ -17,15 +18,19 @@ class BondHandler(TransactionHandler):
 
     def apply(self, txn, context):
         try:
-            message = txn.payload.decode('utf-8')
+            payload_dict = json.loads(txn.payload.decode('utf-8'))
+            method_name = payload_dict['method_name']
+            parameter_dict = payload_dict['method_dict']
         except Exception as e:
             raise InvalidTransaction(e)
 
-        if method == 'issue_bond':
-            actions = issue_bonds(relevant_info)
+        methods = {
+            'issue_bonds': issue_bonds,
+            'buy_bonds_otc': buy_bonds_otc,
+            'initiate_trade': initiate_trade,
+            'cancel_trade': cancel_trade,
+            'accept_trade': accept_trade,
+            'add_crypto': add_crypto
+        }
 
-        method(context, initiator_pubkey, message_dict)
-
-        address = 'aaaaaa' + ('a' * 32) + uuid
-
-        context.set_state({address: pirate_message.encode('utf-8')})
+        methods[method_name](context, initiator_pubkey, parameter_dict)

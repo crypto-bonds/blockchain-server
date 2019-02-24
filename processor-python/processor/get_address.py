@@ -6,8 +6,9 @@ CATEGORY_CRYPTO_TYPES = 4
 CATEGORY_ISSUANCE = 5
 CATEGORY_OWNERS = 6
 CATEGORY_BONDS = 7
-CATEGORY_OWNER_BONDS = 8
-CATEGORY_OWNER_CRYPTOS = 9
+CATEGORY_BANK_BONDS = 13
+CATEGORY_TRADER_BONDS = 8
+CATEGORY_TRADER_CRYPTOS = 9
 CATEGORY_ORDERS = 10
 CATEGORY_CLEARERS = 11
 CATEGORY_OWNER_CRYPTO_PUBKEYS = 12
@@ -55,13 +56,17 @@ def get_bond_address(bond_uuid):
 def get_owner_address(owner_pubkey):
     return owner_pubkey[:32]
 
-@prefixify(CATEGORY_OWNER_BONDS)
-def get_owner_bonds_address(owner_pubkey, issuance_uuid):
-    return owner_pubkey[:32] + issuance_uuid
+@prefixify(CATEGORY_BANK_BONDS)
+def get_bank_bonds_address(bank_pubkey, issuance_uuid):
+    return bank_pubkey[:32] + issuance_uuid
 
-@prefixify(CATEGORY_OWNER_CRYPTOS)
-def get_owner_cryptos_address(owner_pubkey, crypto_type_uuid):
-    return owner_pubkey[:32] + crypto_uuid
+@prefixify(CATEGORY_TRADER_BONDS)
+def get_trader_bonds_address(trader_pubkey, issuance_uuid):
+    return trader_pubkey[:32] + issuance_uuid
+
+@prefixify(CATEGORY_TRADER_CRYPTOS)
+def get_trader_cryptos_address(trader_pubkey, crypto_type_uuid):
+    return trader_pubkey[:32] + crypto_uuid
 
 @prefixify(CATEGORY_CRYPTO_TYPE)
 def get_crypto_type_address(crypto_type_uuid):

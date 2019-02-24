@@ -285,33 +285,42 @@ def add_crypto(context, initiator_pubkey, message_dict):
     pass
 
 def add_clearer(context, initiator_pubkey, message_dict):   
-    clearer_address =  get_addresses.get_clearer_address(initiator_pubkey):
+    clearer_address =  get_addresses.get_clearer_address(initiator_pubkey)
+
     clearer_data = {
-        'pubkey': clearer_address
+        'pubkey': initiator_pubkey
     }
+
     new_state_dict = {
         clearer_address: clearer_data
     }
+
     context.set_state(new_state_dict)
 
     
 
 def add_bank(context, initiator_pubkey, message_dict):   
-    bank_address = get_addresses.get_owner_address(initiator_pubkey):
+    bank_address = get_addresses.get_owner_address(initiator_pubkey)
+
     bank_data = {
-        'pubkey':bank_address
+        'pubkey': initiator_pubkey
     }
+
     new_state_dict = {
         bank_address: bank_data
     }
+
     context.set_state(new_state_dict)
 
 def add_trader(context, initiator_pubkey, message_dict):
-    trader_address = get_addresses.get_owner_address(initiator_pubkey):
+    trader_address = get_addresses.get_owner_address(initiator_pubkey)
+
     trader_data = {
-        'pubkey':trader_address
+        'pubkey': initiator_pubkey
     }
+
     new_state_dict = {
         trader_address: trader_data
     }
+
     context.set_state(new_state_dict)

@@ -61,17 +61,17 @@ def issue_bond(context, initiator_pubkey, message_dict):
 
     # create bonds
     for serial in issuance_data['serials']:
-        new_state_dict[get_issuance_address(serial)] = {
+        new_state_dict[get_address.get_issuance_address(serial)] = json.dumps({
                 'owner_pubkey': message_dict['bank_pubkey'],
                 'issuance_uuid': message_dict['issuance_uuid']
-        }
+        }, sort_keys=True)
 
     # assign bonds to owner
     bank_bonds_address = get_addresses.get_bank_bonds_address(message_dict['bank_pubkey'], message_dict['issuance_uuid'])
-    new_state_dict[bank_bonds_address] = {
+    new_state_dict[bank_bonds_address] = json.dumps({
         'num_owned': len(issuance_data['serials']),
         'serials': issuance_data['serials']
-    }
+    }, sort_keys=True)
 
     context.set_state(new_state_dict)
 
@@ -102,19 +102,19 @@ def buy_bonds_otc(context, initiator_pubkey, message_dict):
 
     bank_data['num_owned'] -= num_bought
     bank_data['serials'] = serials_to_stay
-    new_state_dict[bank_address] = bank_data
+    new_state_dict[bank_address] = json.dumps(bank_data, sort_keys=True)
 
     for serial in serials_to_transfer:
         bond_address = get_addresses.get_bond_address(serial)
         bond_data = get_data.query(bond_address)
         bond_data['owner_pubkey'] = message_dict['trader_pubkey']
-        new_state_dict[bond_address] = bond_data
+        new_state_dict[bond_address] = json.dumps(bond_data, sort_keys=True)
     
     trader_address = get_addresses.get_trader_bonds_address(message_dict['trader_pubkey'], message_dict['issuance_uuid'])
     trader_data = get_data.query(trader_address)
     trader_data['total_owned'] += num_bought
     trader_data['serials'] = sorted(trader_data['serials'] + serials_to_transfer)
-    new_state_dict[trader_address] = trader_data
+    new_state_dict[trader_address] = json.dumps(trader_data, sort_keys=True)
     
     context.set_state(new_state_dict)
 
@@ -138,19 +138,19 @@ def initiate_trade(context, initiator_pubkey, message_dict):
     new_state_dict = {}
 
     # Creates order
-    new_state_dict[order_address] = {
+    new_state_dict[order_address] = json.dumps({
         'initiator_pubkey' = initiator_pubkey,
         'sell_asset_type' = message_dict['sell_asset_type'],
         'buy_asset_type' = message_dict['buy_asset_type'],
         'num_to_sell' = message_dict['num_to_sell'],
         'num_to_buy' = message_dict['num_to_buy']
-    }
+    }, sort_keys=True)
 
     # Update trader's totals
     trader_data['num_in_orders'] += trader_data['num_to_sell']
     trader_data['orders'] = sorted(trader_data['orders'] + [message_dict['order_uuid']])
     
-    new_state_dict[trader_address] = trader_data
+    new_state_dict[trader_address] = json.dumps(trader_data, sort_keys=True)
 
     # Keep track of the orderbook
     # Buy + sell is redundant, but good for indexing. Buying one bond for $1 is the same as selling $1 for one bond
@@ -160,8 +160,8 @@ def initiate_trade(context, initiator_pubkey, message_dict):
     sell_data = get_data.query(sell_address)
     buy_data['orders'] = sorted(buy_data['orders'] + [message_dict['order_uuid']])
     sell_data['orders'] = buy_data['orders']
-    new_state_dict[buy_address] = buy_data
-    new_state_dict[sell_data] = sell_data
+    new_state_dict[buy_address] = json.dumps(buy_data, sort_keys=True)
+    new_state_dict[sell_data] = json.dumps(sell_data, sort_keys=True)
 
     context.set_state(new_state_dict)
 
@@ -205,8 +205,8 @@ def accept_trade(context, initiator_pubkey, message_dict):
     sell_order_data['orders'].remove(message_dict['order_uuid'])
 
     # save updated order books
-    new_state_dict[buy_order_address] = buy_order_data
-    new_state_dict[sell_order_address] = sell_order_data
+    new_state_dict[buy_order_address] = json.dumps(buy_order_data, sort_keys=True)
+    new_state_dict[sell_order_address] = json.dumps(sell_order_data, sort_keys=True)
     
     # start manipulaing trader data
     trade_initiator_bond_asset1_data = get_data.query(trade_initiator_bond_asset1_address)
@@ -260,24 +260,24 @@ def accept_trade(context, initiator_pubkey, message_dict):
     trade_initiator_bond_asset2_data['serials'] = sorted(trade_acceptor_bond_asset2_data['serials'] + asset2_serials_to_move)
 
     # commit asset movements
-    new_state_dict[trade_initiator_bond_asset1_address] = trade_initiator_bond_asset1_data
-    new_state_dict[trade_initiator_bond_asset2_address] = trade_initiator_bond_asset2_data
+    new_state_dict[trade_initiator_bond_asset1_address] = json.dumps(trade_initiator_bond_asset1_data, sort_keys=True)
+    new_state_dict[trade_initiator_bond_asset2_address] = json.dumps(trade_initiator_bond_asset2_data, sort_keys=True)
 
-    new_state_dict[trade_acceptor_bond_asset1_address] = trade_acceptor_bond_asset1_data
-    new_state_dict[trade_acceptor_bond_asset2_address] = trade_acceptor_bond_asset2_data
+    new_state_dict[trade_acceptor_bond_asset1_address] = json.dumps(trade_acceptor_bond_asset1_data, sort_keys=True)
+    new_state_dict[trade_acceptor_bond_asset2_address] = json.dumps(trade_acceptor_bond_asset2_data, sort_keys=True)
 
     # reassign individual bonds
     for serial in asset1_serials_to_move:
         bond_address = get_addresses.get_bond_address(serial)
         bond_data = get_data.query(bond_address)
         bond_data['owner_pubkey'] = initiator_pubkey
-        new_state_dict[bond_address] = bond_data
+        new_state_dict[bond_address] = json.dumps(bond_data, sort_keys=True)
     
     for serial in asset2_serials_to_move:
         bond_address = get_addresses.get_bond_address(serial)
         bond_data = get_data.query(bond_address)
         bond_data['owner_pubkey'] = order_data['initiator_pubkey']
-        new_state_dict[bond_address] = bond_data
+        new_state_dict[bond_address] = json.dumps(bond_data, sort_keys=True)
 
     context.set_state(new_state_dict)
 
@@ -287,9 +287,9 @@ def add_crypto(context, initiator_pubkey, message_dict):
 def add_clearer(context, initiator_pubkey, message_dict):   
     clearer_address =  get_addresses.get_clearer_address(initiator_pubkey)
 
-    clearer_data = {
+    clearer_data = json.dumps({
         'pubkey': initiator_pubkey
-    }
+    }, sort_keys=True)
 
     new_state_dict = {
         clearer_address: clearer_data
@@ -302,9 +302,9 @@ def add_clearer(context, initiator_pubkey, message_dict):
 def add_bank(context, initiator_pubkey, message_dict):   
     bank_address = get_addresses.get_owner_address(initiator_pubkey)
 
-    bank_data = {
+    bank_data = json.dumps({
         'pubkey': initiator_pubkey
-    }
+    }, sort_keys=True)
 
     new_state_dict = {
         bank_address: bank_data
@@ -315,9 +315,9 @@ def add_bank(context, initiator_pubkey, message_dict):
 def add_trader(context, initiator_pubkey, message_dict):
     trader_address = get_addresses.get_owner_address(initiator_pubkey)
 
-    trader_data = {
+    trader_data = json.dumps({
         'pubkey': initiator_pubkey
-    }
+    }, sort_keys=True)
 
     new_state_dict = {
         trader_address: trader_data

@@ -315,6 +315,24 @@ def accept_trade(context, initiator_pubkey, message_dict):
 
     context.set_state(new_state_dict)
 
+def add_crypto_type(context, initiator_pubkey, message_dict):
+    # TODO Add Permissions
+    crypto_type_address = get_address.get_crypto_type_address(message_dict['crypto_type_uuid'])
+
+    crypto_type_data = {
+        'name': message_dict['name'],
+        'link': message_dict['link']
+    }
+    
+    new_state_dict = {
+        crypto_type_address: json.dumps(, sort_keys=True)
+    }
+
+    context.set_state(new_state_dict)
+
+def add_crypto_address(context, initiator_pubkey, message_dict):
+    pass
+
 def add_crypto(context, initiator_pubkey, message_dict):
     pass
 

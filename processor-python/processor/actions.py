@@ -1,11 +1,11 @@
 from uuid import uuid4
 import json
 
-from pirate_preprocessor import category_ids
+from preprocessor import get_addresses
 
 
 def is_clearer(context, initiator_pubkey):
-    clearer_addr = category_ids.get_clearer_address(initiator_pubkey)
+    clearer_addr = get_addresses.get_clearer_address(initiator_pubkey)
     state_info = context.get_state([clearer_addr])
     if state_info[clearer_addr] is None:
         return False
@@ -22,6 +22,17 @@ def is_bank(context, bank_pubkey):
             return False
     return True
 
+def is_trader(context, trader_pubkey):
+    trader_address = get_owner_address(trader_pubkey)
+    trader_state_info = context.get_state([trader_address])
+    if trader_info[trader_address] is None:
+        return False
+    else:
+        trader_data = json.loads(trader_info[trader_address].decode('utf-8'))
+        if trader_data['type'] != 'trader':
+            return False
+    return True
+
 def issue_bond(context, initiator_pubkey, message_dict):
 
     if not is_bank(context, message_dict['bank_pubkey'])
@@ -32,7 +43,7 @@ def issue_bond(context, initiator_pubkey, message_dict):
     new_state_dict = {}
         
     # create bond type
-    issuance_address = category_ids.get_issuance_address(message_dict['issuance_uuid'])
+    issuance_address = get_addresses.get_issuance_address(message_dict['issuance_uuid'])
     issuance_data = {
         'company_pubkey': message_dict['company_pubkey'],
         'bank_pubkey': message_dict['bank_pubkey'],
@@ -56,7 +67,7 @@ def issue_bond(context, initiator_pubkey, message_dict):
         }
 
     # assign bonds to owner
-    bank_bonds_address = category_ids.get_bank_bonds_address(message_dict['bank_pubkey'], message_dict['issuance_uuid'])
+    bank_bonds_address = get_addresses.get_bank_bonds_address(message_dict['bank_pubkey'], message_dict['issuance_uuid'])
     new_state_dict[bank_bonds_address] = {
         'num_owned': len(issuance_data['serials']),
         'serials': issuance_data['serials']
@@ -65,7 +76,30 @@ def issue_bond(context, initiator_pubkey, message_dict):
     context.set_state(new_state_dict)
 
 def buy_bonds_otc(context, initiator_pubkey, message_dict):
-    pass
+    # transfer bonds from bank to trader
+    # make sure bank is bank
+    # make sure trader is trader
+
+    if not is_clearer(initiator_pubkey):
+        return
+    if not is_bank(message_dict['bank_pubkey']):
+        return
+    if not is_trader(message_dict['trader_pubkey']):
+        return
+    
+    # get the first ids from the bank
+    message_dict['issuance_uuid']
+    num_bought = message_dict['num_bought']
+
+    bonds_address = get_addresses.get_bank_bonds_address(message_dict['bank_pubkey'], message_dict['issuance_uuid'])
+    bonds_to_transfer = 
+
+
+    # change owner on bonds
+    # change totals and serials for bank (bank bonds)
+    # change totals and serials for trader (trader bonds)
+    # change bank bonds
+    context.set_state(new_state_dict)
 
 def initiate_trade(context, initiator_pubkey, message_dict):
     pass

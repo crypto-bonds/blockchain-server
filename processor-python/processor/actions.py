@@ -119,7 +119,49 @@ def buy_bonds_otc(context, initiator_pubkey, message_dict):
     context.set_state(new_state_dict)
 
 def initiate_trade(context, initiator_pubkey, message_dict):
-    pass
+    if not is_trader(initiator_pubkey):
+        return
+    
+    order_address = get_addresses.get_order_address(message_dict['order_uuid'])
+
+    if get_data.query(order_address) is not None:
+        return  # A new order can't already exist
+
+    trader_address = get_addresses.get_trader_bonds_address(initiator_pubkey)
+    trader_data = get_data.query(trader_address)
+    
+    if trader_data['total_owned'] - trader_data['num_in_orders'] < message_dict['num_to_sell']:
+        return  # Can only sell ones that are not already in orders
+
+    new_state_dict = {}
+
+    # Creates order
+    new_state_dict[order_address] = {
+        'initiator_pubkey' = initiator_pubkey,
+        'sell_asset_type' = message_dict['sell_asset_type'],
+        'buy_asset_type' = message_dict['buy_asset_type'],
+        'num_to_sell' = message_dict['num_to_sell'],
+        'num_to_buy' = message_dict['num_to_buy']
+    }
+
+    # Update trader's totals
+    trader_data['num_in_orders'] += trader_data['num_to_sell']
+    trader_data['orders'] = sorted(trader_data['orders'] + [message_dict['order_uuid']])
+    
+    new_state_dict[trader_address] = trader_data
+
+    # Keep track of the orderbook
+    # Buy + sell is redundant, but good for indexing. Buying one bond for $1 is the same as selling $1 for one bond
+    buy_address = get_addresses.get_buy_address(message_dict['buy_asset_type'], message_dict['sell_asset_type'])
+    sell_address = get_addresses.get_sell_address(message_dict['sell_asset_type'], message_dict['buy_asset_type'])
+    buy_data = get_data.query(buy_address)
+    sell_data = get_data.query(sell_address)
+    buy_data['orders'] = sorted(buy_data['orders'] + [message_dict['order_uuid']])
+    sell_data['orders'] = buy_data['orders']
+    new_state_dict[buy_address] = buy_data
+    new_state_dict[sell_data] = sell_data
+
+    context.set_state(new_state_dict)
 
 def cancel_trade(context, initiator_pubkey, message_dict):
     pass

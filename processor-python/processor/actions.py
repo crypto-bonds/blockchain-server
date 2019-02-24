@@ -60,10 +60,10 @@ def issue_bond(context, initiator_pubkey, message_dict):
     new_state_dict[issuance_address] = json.dumps(issuance_data, sort_keys=True)
 
     # create bonds
-    for bond_uuid in issuance_data['serials']:
-        new_state_dict[get_issuance_address(bond_uuid)] = {
+    for serial in issuance_data['serials']:
+        new_state_dict[get_issuance_address(serial)] = {
                 'owner_pubkey': message_dict['bank_pubkey'],
-                'issuance_uuid': bond_uuid
+                'issuance_uuid': message_dict['issuance_uuid']
         }
 
     # assign bonds to owner
@@ -97,15 +97,15 @@ def buy_bonds_otc(context, initiator_pubkey, message_dict):
     if num_bought > num_owned:
         return  # transaction failed
 
-    bonds_to_transfer = data['serials'][:num_bought]
-    bonds_to_stay = data['serials'][num_bought:]
+    serials_to_transfer = data['serials'][:num_bought]
+    serials_to_stay = data['serials'][num_bought:]
 
     bank_data['num_owned'] -= num_bought
-    bank_data['serials'] = bonds_to_stay
+    bank_data['serials'] = serials_to_stay
     new_state_dict[bank_address] = bank_data
 
-    for bond_uuid in bonds_to_transfer:
-        bond_address = get_addresses.get_bond_address(bond_uuid)
+    for serial in serials_to_transfer:
+        bond_address = get_addresses.get_bond_address(serial)
         bond_data = get_data.query(bond_address)
         bond_data['owner_pubkey'] = message_dict['trader_pubkey']
         new_state_dict[bond_address] = bond_data
@@ -113,7 +113,7 @@ def buy_bonds_otc(context, initiator_pubkey, message_dict):
     trader_address = get_addresses.get_trader_bonds_address(message_dict['trader_pubkey'], message_dict['issuance_uuid'])
     trader_data = get_data.query(trader_address)
     trader_data['total_owned'] += num_bought
-    trader_data['serials'] = sorted(trader_data['serials'] + bonds_to_transfer)
+    trader_data['serials'] = sorted(trader_data['serials'] + serials_to_transfer)
     new_state_dict[trader_address] = trader_data
     
     context.set_state(new_state_dict)
@@ -127,8 +127,10 @@ def initiate_trade(context, initiator_pubkey, message_dict):
     if get_data.query(order_address) is not None:
         return  # A new order can't already exist
 
-    trader_address = get_addresses.get_trader_bonds_address(initiator_pubkey)
+    trader_address = get_addresses.get_trader_bonds_address(initiator_pubkey, message_dict['sell_asset'])
     trader_data = get_data.query(trader_address)
+    if trader_data is None:
+        return # None owned
     
     if trader_data['total_owned'] - trader_data['num_in_orders'] < message_dict['num_to_sell']:
         return  # Can only sell ones that are not already in orders
@@ -152,8 +154,8 @@ def initiate_trade(context, initiator_pubkey, message_dict):
 
     # Keep track of the orderbook
     # Buy + sell is redundant, but good for indexing. Buying one bond for $1 is the same as selling $1 for one bond
-    buy_address = get_addresses.get_buy_address(message_dict['buy_asset_type'], message_dict['sell_asset_type'])
-    sell_address = get_addresses.get_sell_address(message_dict['sell_asset_type'], message_dict['buy_asset_type'])
+    buy_address = get_addresses.get_buy_order_address(message_dict['buy_asset_type'], message_dict['sell_asset_type'])
+    sell_address = get_addresses.get_sell_order_address(message_dict['sell_asset_type'], message_dict['buy_asset_type'])
     buy_data = get_data.query(buy_address)
     sell_data = get_data.query(sell_address)
     buy_data['orders'] = sorted(buy_data['orders'] + [message_dict['order_uuid']])
@@ -167,7 +169,117 @@ def cancel_trade(context, initiator_pubkey, message_dict):
     pass
 
 def accept_trade(context, initiator_pubkey, message_dict):
-    pass
+    # in this context, there is initiator_pubkey and order_data['initiator_pubkey']
+    # initiator_pubkey initiates the acceptance
+    # order_data['initiator_pubkey'] initiated the order
+
+    if not is_trader(initiator_pubkey):
+        return
+    
+    order_address = get_addresses.get_order_address(message_dict['order_uuid'])
+    order_data = get_data.query(order_address)
+
+    # Call it bond because in the future, we also want to use crypto and distinguish between the two
+    trade_initiator_bond_asset1_address = get_addresses.get_trader_bonds_address(order_data['initiator_pubkey'], order_data['sell_asset_type'])
+    trade_initiator_bond_asset2_address = get_addresses.get_trader_bonds_address(order_data['initiator_pubkey'], order_data['buy_asset_type'])
+
+    trade_acceptor_bond_asset1_address = get_addresses.get_trader_bonds_address(initiator_pubkey, order_data['sell_asset_type'])
+    trade_acceptor_bond_asset2_address = get_addresses.get_trader_bonds_address(initiator_pubkey, order_data['buy_asset_type'])
+
+    # asset 1 goes from initiator to acceptor
+    # asset 2 goes from acceptor to initiator
+    trade_acceptor_bond_asset2_data = get_data.query(trade_acceptor_bond_asset2_address)
+    if trade_acceptor_bond_asset2_data is None:
+        return  # Trader has none
+    
+    if trade_acceptor_bond_asset2_data['total_owned'] - trade_acceptor_bond_asset2_data['num_in_orders'] < order_data['num_to_buy']:
+        return  # Not enough to fulfill
+
+    # remove order from order books
+    buy_order_address = get_addresses.get_buy_order_address(order_data['sell_asset_type'], order_data['buy_asset_type'])
+    sell_order_address = get_addresses.get_sell_order_address(order_data['buy_asset_type'], order_data['sell_asset_type'])
+    buy_order_data = get_data.query(buy_order_address)
+    sell_order_data = get_data.query(sell_order_address)
+
+    buy_order_data['orders'].remove(message_dict['order_uuid'])
+    sell_order_data['orders'].remove(message_dict['order_uuid'])
+
+    # save updated order books
+    new_state_dict[buy_order_address] = buy_order_data
+    new_state_dict[sell_order_address] = sell_order_data
+    
+    # start manipulaing trader data
+    trade_initiator_bond_asset1_data = get_data.query(trade_initiator_bond_asset1_address)
+    trade_initiator_bond_asset2_data = get_data.query(trade_initiator_bond_asset2_address)
+    
+    trade_acceptor_bond_asset1_data = get_data.query(trade_acceptor_bond_asset1_address)
+    trade_acceptor_bond_asset2_data = get_data.query(trade_acceptor_bond_asset2_address)
+
+    if trade_initiator_bond_asset2_data is None:
+        trade_initiator_bond_asset2_data = {
+            'total_owned': 0,
+            'num_in_orders': 0,
+            'serials': [],
+            'orders': []
+        }
+    
+    if trade_acceptor_bond_asset1_data is None:
+        trade_acceptor_bond_asset1_data = {
+            'total_owned': 0,
+            'num_in_orders': 0,
+            'serials': [],
+            'orders': []
+        }
+
+    # remove order from initiator order list
+    trade_initiator_bond_asset1_data['orders'].remove(message_dict['order_uuid'])
+
+    # delete order
+    new_state_dict[order_address] = None  # TODO This may not be right
+
+    # move asset 1
+    asset1_serials_to_move = trade_initiator_bond_asset1_data['serials'][:order_data['num_to_sell']]
+    asset1_serials_to_stay = trade_initiator_bond_asset1_data['serials'][order_data['num_to_sell']:]
+
+    trade_initiator_bond_asset1_data['num_in_orders'] -= order_data['num_to_sell']
+    trade_initiator_bond_asset1_data['total_owned'] -= order_data['num_to_sell']
+    trade_initiator_bond_asset1_data['serials'] = asset1_serials_to_stay
+
+    trade_acceptor_bond_asset1_data['total_owned'] += order_data['num_to_sell']
+    trade_acceptor_bond_asset1_data['serials'] = sorted(trade_acceptor_bond_asset1_data['serials'] + asset1_serials_to_move)
+    
+    # move asset 2
+    asset2_serials_to_move = trade_acceptor_bond_asset2_data['serials'][:order_data['num_to_buy']]
+    asset2_serials_to_stay = trade_acceptor_bond_asset2_data['serials'][order_data['num_to_buy']:]
+
+    # skip num_in_orders because acceptor never places order
+    trade_acceptor_bond_asset2_data['total_owned'] -= order_data['num_to_buy']
+    trade_acceptor_bond_asset2_data['serials'] = asset2_serials_to_stay
+
+    trade_initiator_bond_asset2_data['total_owned'] += order_data['num_to_buy']
+    trade_initiator_bond_asset2_data['serials'] = sorted(trade_acceptor_bond_asset2_data['serials'] + asset2_serials_to_move)
+
+    # commit asset movements
+    new_state_dict[trade_initiator_bond_asset1_address] = trade_initiator_bond_asset1_data
+    new_state_dict[trade_initiator_bond_asset2_address] = trade_initiator_bond_asset2_data
+
+    new_state_dict[trade_acceptor_bond_asset1_address] = trade_acceptor_bond_asset1_data
+    new_state_dict[trade_acceptor_bond_asset2_address] = trade_acceptor_bond_asset2_data
+
+    # reassign individual bonds
+    for serial in asset1_serials_to_move:
+        bond_address = get_addresses.get_bond_address(serial)
+        bond_data = get_data.query(bond_address)
+        bond_data['owner_pubkey'] = initiator_pubkey
+        new_state_dict[bond_address] = bond_data
+    
+    for serial in asset2_serials_to_move:
+        bond_address = get_addresses.get_bond_address(serial)
+        bond_data = get_data.query(bond_address)
+        bond_data['owner_pubkey'] = order_data['initiator_pubkey']
+        new_state_dict[bond_address] = bond_data
+
+    context.set_state(new_state_dict)
 
 def add_crypto(context, initiator_pubkey, message_dict):
     pass

@@ -2,7 +2,7 @@ import sys
 import argparse
 
 from sawtooth_sdk.processor.core import TransactionProcessor
-from processor.handler import PirateHandler
+from processor.handler import BondHandler
 
 
 def parse_args(args):
@@ -24,16 +24,16 @@ def main():
     try:
         processor = TransactionProcessor(url=opts.connect)
 
-        handler = PirateHandler()
+        handler = BondHandler()
         processor.add_handler(handler)
 
-        print('YARRRR READY TO TALK LIKE A PIRATE!!!')
+        print("Who's ready to issue some bonds???")
         processor.start()
     except KeyboardInterrupt:
         pass
     except Exception as e:
         print('YARRRR BROKE: {}'.format(e), file=sys.stderr)
     finally:
-        print('YARRRRRRR NO MORE PIRATE TALK TODAY!!!!!')
+        print('YARRRRRRR NO MORE TRANSACTIONS TODAY!!!!!')
         if processor is not None:
             processor.stop()

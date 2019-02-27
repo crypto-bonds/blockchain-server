@@ -12,28 +12,28 @@ def is_clearer(context, initiator_pubkey):
     return True
 
 def is_bank(context, bank_pubkey):
-    bank_address = get_owner_address(bank_pubkey)
+    bank_address = get_addresses.get_owner_address(bank_pubkey)
     bank_state_info = context.get_state([bank_address])
-    if bank_info[bank_address] is None:
+    if bank_state_info[bank_address] is None:
         return False
     else:
-        bank_data = json.loads(bank_info[bank_address].decode('utf-8'))
+        bank_data = json.loads(bank_state_info[bank_address].decode('utf-8'))
         if bank_data['type'] != 'bank':
             return False
     return True
 
 def is_trader(context, trader_pubkey):
-    trader_address = get_owner_address(trader_pubkey)
+    trader_address = get_addresses.get_owner_address(trader_pubkey)
     trader_state_info = context.get_state([trader_address])
-    if trader_info[trader_address] is None:
+    if trader_state_info[trader_address] is None:
         return False
     else:
-        trader_data = json.loads(trader_info[trader_address].decode('utf-8'))
+        trader_data = json.loads(trader_state_info[trader_address].decode('utf-8'))
         if trader_data['type'] != 'trader':
             return False
     return True
 
-def issue_bond(context, initiator_pubkey, message_dict):
+def issue_bonds(context, initiator_pubkey, message_dict):
 
     if not is_bank(context, message_dict['bank_pubkey']):
         return
@@ -61,7 +61,7 @@ def issue_bond(context, initiator_pubkey, message_dict):
 
     # create bonds
     for serial in issuance_data['serials']:
-        new_state_dict[get_address.get_issuance_address(serial)] = json.dumps({
+        new_state_dict[get_addresses.get_issuance_address(serial)] = json.dumps({
                 'owner_pubkey': message_dict['bank_pubkey'],
                 'issuance_uuid': message_dict['issuance_uuid']
         }, sort_keys=True)
@@ -80,27 +80,25 @@ def buy_bonds_otc(context, initiator_pubkey, message_dict):
     # make sure bank is bank
     # make sure trader is trader
 
-    if not is_clearer(initiator_pubkey):
+    if not is_clearer(context, initiator_pubkey):
         return
-    if not is_bank(message_dict['bank_pubkey']):
+    if not is_bank(context, message_dict['bank_pubkey']):
         return
-    if not is_trader(message_dict['trader_pubkey']):
+    if not is_trader(context, message_dict['trader_pubkey']):
         return
     
     new_state_dict = {}
 
     # get the first ids from the bank
-    num_bought = message_dict['num_bought']
-
     bank_address = get_addresses.get_bank_bonds_address(message_dict['bank_pubkey'], message_dict['issuance_uuid'])
     bank_data = get_data.query(bank_address)
-    if num_bought > num_owned:
-        return  # transaction failed
+    if message_dict['num_bought'] > message_dict['num_owned']:
+        return  # TODO Throw transaction failed error
 
-    serials_to_transfer = data['serials'][:num_bought]
-    serials_to_stay = data['serials'][num_bought:]
+    serials_to_transfer = bank_data['serials'][:message_dict['num_bought']]
+    serials_to_stay = bank_data['serials'][message_dict['num_bought']:]
 
-    bank_data['num_owned'] -= num_bought
+    bank_data['num_owned'] -= message_dict['num_bought']
     bank_data['serials'] = serials_to_stay
     new_state_dict[bank_address] = json.dumps(bank_data, sort_keys=True)
 
@@ -112,14 +110,14 @@ def buy_bonds_otc(context, initiator_pubkey, message_dict):
     
     trader_address = get_addresses.get_trader_bonds_address(message_dict['trader_pubkey'], message_dict['issuance_uuid'])
     trader_data = get_data.query(trader_address)
-    trader_data['total_owned'] += num_bought
+    trader_data['total_owned'] += message_dict['num_bought']
     trader_data['serials'] = sorted(trader_data['serials'] + serials_to_transfer)
     new_state_dict[trader_address] = json.dumps(trader_data, sort_keys=True)
     
     context.set_state(new_state_dict)
 
 def initiate_trade(context, initiator_pubkey, message_dict):
-    if not is_trader(initiator_pubkey):
+    if not is_trader(context, initiator_pubkey):
         return
     
     order_address = get_addresses.get_order_address(message_dict['order_uuid'])
@@ -139,11 +137,11 @@ def initiate_trade(context, initiator_pubkey, message_dict):
 
     # Creates order
     new_state_dict[order_address] = json.dumps({
-        'initiator_pubkey' = initiator_pubkey,
-        'sell_asset_type' = message_dict['sell_asset_type'],
-        'buy_asset_type' = message_dict['buy_asset_type'],
-        'num_to_sell' = message_dict['num_to_sell'],
-        'num_to_buy' = message_dict['num_to_buy']
+        'initiator_pubkey': initiator_pubkey,
+        'sell_asset_type': message_dict['sell_asset_type'],
+        'buy_asset_type': message_dict['buy_asset_type'],
+        'num_to_sell': message_dict['num_to_sell'],
+        'num_to_buy': message_dict['num_to_buy']
     }, sort_keys=True)
 
     # Update trader's totals
@@ -174,6 +172,8 @@ def cancel_trade(context, initiator_pubkey, message_dict):
     
     if order_data['initiator_pubkey'] != initiator_pubkey:
         return  # Only initiator can cancel trades
+
+    new_state_dict = {}
 
     # remove order from order books
     buy_order_address = get_addresses.get_buy_order_address(order_data['sell_asset_type'], order_data['buy_asset_type'])
@@ -207,7 +207,7 @@ def accept_trade(context, initiator_pubkey, message_dict):
     # initiator_pubkey initiates the acceptance
     # order_data['initiator_pubkey'] initiated the order
 
-    if not is_trader(initiator_pubkey):
+    if not is_trader(context, initiator_pubkey):
         return
     
     order_address = get_addresses.get_order_address(message_dict['order_uuid'])
@@ -228,6 +228,8 @@ def accept_trade(context, initiator_pubkey, message_dict):
     
     if trade_acceptor_bond_asset2_data['total_owned'] - trade_acceptor_bond_asset2_data['num_in_orders'] < order_data['num_to_buy']:
         return  # Not enough to fulfill
+
+    new_state_dict = {}
 
     # remove order from order books
     buy_order_address = get_addresses.get_buy_order_address(order_data['sell_asset_type'], order_data['buy_asset_type'])
@@ -317,18 +319,19 @@ def accept_trade(context, initiator_pubkey, message_dict):
 
 def add_crypto_type(context, initiator_pubkey, message_dict):
     # TODO Add Permissions
-    crypto_type_address = get_address.get_crypto_type_address(message_dict['crypto_type_uuid'])
+    crypto_type_address = get_addresses.get_crypto_type_address(message_dict['crypto_type_uuid']).encode('utf-8')
 
     crypto_type_data = {
         'name': message_dict['name'],
         'link': message_dict['link']
     }
-    
+    encoded_data = json.dumps(crypto_type_data, sort_keys=True).encode('utf-8')
     new_state_dict = {
-        crypto_type_address: json.dumps(, sort_keys=True)
+        crypto_type_address: encoded_data
     }
 
     context.set_state(new_state_dict)
+    
 
 def add_crypto_address(context, initiator_pubkey, message_dict):
     pass

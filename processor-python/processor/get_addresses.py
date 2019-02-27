@@ -1,6 +1,7 @@
-import handler
+from processor import handler
 
 CATEGORY_BUY_ORDERS = 0
+CATEGORY_SELL_ORDERS = 1
 CATEGORY_CRYPTO_TYPES = 4
 CATEGORY_ISSUANCE = 5
 CATEGORY_OWNERS = 6
@@ -15,25 +16,31 @@ CATEGORY_OWNER_CRYPTO_PUBKEYS = 12
 ADDRESS_LEGNTH = 70
 
 def get_category_prefix(category):
-    return handler.BondHandler.namespaces[0] + hex(category)[2:]
+    # We need to zero pad so that (for example) '4' becomes '04'
+    return 'b04d' + ('0' + hex(category)[2:])[-2:]
 
-def add_category(method, category):
-    def category_adder(*args, **kwargs):
-        return get_category_prefix(category) + method(*args, **kwargs)
-    return category_adder
+def add_category(category):
+    def decorator(method):
+        def category_adder(*args, **kwargs):
+            return get_category_prefix(category) + method(*args, **kwargs)
+        return category_adder
+    return decorator
 
 def zero_pad(method):
+    global ADDRESS_LEGNTH
     def padder(*args, **kwargs):
         address = method(*args, **kwargs)
-        return '0' * (ADDRESS_LENGTH - 6 - len(address)) + address
+        return '0' * (ADDRESS_LEGNTH - 6 - len(address)) + address
     return padder
 
-def prefixify(method, category):
-    @add_category(category)
-    @zero_pad
-    def prefixer(*args, **kwargs):
-        return method(*args, **kwargs)
-    return prefixer
+def prefixify(category):
+    def decorator(method):
+        @add_category(category)
+        @zero_pad
+        def prefixer(*args, **kwargs):
+            return method(*args, **kwargs)
+        return prefixer
+    return decorator
 
 @prefixify(CATEGORY_BUY_ORDERS)
 def get_buy_order_address(buy_asset_type_uuid, sell_asset_type_uuid):
@@ -65,9 +72,9 @@ def get_trader_bonds_address(trader_pubkey, issuance_uuid):
 
 @prefixify(CATEGORY_TRADER_CRYPTOS)
 def get_trader_cryptos_address(trader_pubkey, crypto_type_uuid):
-    return trader_pubkey[:32] + crypto_uuid
+    return trader_pubkey[:32] + crypto_type_uuid
 
-@prefixify(CATEGORY_CRYPTO_TYPE)
+@prefixify(CATEGORY_CRYPTO_TYPES)
 def get_crypto_type_address(crypto_type_uuid):
     return crypto_type_uuid
 

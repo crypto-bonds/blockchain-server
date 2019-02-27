@@ -2,3 +2,4 @@ dist/
 node_modules/
 
 processor-python/pirate_processor/__pychache__/**
+**.pyc
